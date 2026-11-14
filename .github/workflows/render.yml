@@ -1,0 +1,33 @@
+name: render
+on:
+  workflow_dispatch:
+    inputs:
+      partes: { description: 'quantas máquinas', required: true }
+jobs:
+  plano:
+    runs-on: ubuntu-latest
+    outputs:
+      lista: ${{ steps.p.outputs.lista }}
+    steps:
+      - id: p
+        run: echo "lista=$(python3 -c "import json;print(json.dumps(list(range(${{ inputs.partes }}))))")" >> $GITHUB_OUTPUT
+  render:
+    needs: plano
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        i: ${{ fromJson(needs.plano.outputs.lista) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm i --no-audit --no-fund @remotion/renderer@4.0.539 > /dev/null
+      - run: node render-pedaco.mjs ${{ matrix.i }} ${{ inputs.partes }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: p-${{ matrix.i }}
+          path: saida/
+          retention-days: 1
